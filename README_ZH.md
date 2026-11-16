@@ -4,6 +4,7 @@
 > 4.0.44 新增每个模型的“使用精简提示词”开关，默认开启；精简模式保留 Codex / Claude 原生身份标识，关闭后保留所选原生或固定模板的完整提示词。
 > 保活支持 npm 安装的 Claude Code，可识别由 Node 启动的 JS 入口和 npm 包内的原生二进制。
 > 找不到本地 Codex / Claude Code 时，保活自动使用内置固定请求模板；后续检测到客户端时自动切回原生模板。
+> 聚合重试可识别 HTTP 200 响应中的 `no_capacity` / `too_many_requests` 结构化错误及明确的峰值负载容量不足消息，在有效输出前继续重试。
 > 使用方式、构建命令与源码来源见 [定制说明](CUSTOMIZATION.md)。下方保留上游原始文档。
 
 <div align="center">

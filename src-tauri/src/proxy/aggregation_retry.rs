@@ -1085,13 +1085,15 @@ pub(super) fn retryable_error_code(error: &Value) -> Option<&'static str> {
         "type",
     ] {
         match error.get(field).and_then(Value::as_str) {
-            Some("rate_limit_exceeded") => return Some("rate_limit_exceeded"),
+            Some("rate_limit_exceeded" | "too_many_requests") => {
+                return Some("rate_limit_exceeded")
+            }
             Some("rate_limit_error") => return Some("rate_limit_error"),
             Some("token_rate_limit_exceeded") => return Some("token_rate_limit_exceeded"),
             Some("server_error" | "internal_server_error" | "internal_error" | "api_error") => {
                 return Some("upstream_server_error")
             }
-            Some("overloaded" | "overloaded_error" | "model_overloaded") => {
+            Some("overloaded" | "overloaded_error" | "model_overloaded" | "no_capacity") => {
                 return Some("upstream_overloaded")
             }
             Some("service_unavailable" | "service_unavailable_error") => {
@@ -1128,9 +1130,11 @@ pub(super) fn retryable_error_code(error: &Value) -> Option<&'static str> {
         return Some("azure_token_rate_limit");
     }
     let message_lower = message.to_ascii_lowercase();
-    if message_lower.contains("currently experiencing high demand")
-        && message_lower.contains("temporary errors")
-    {
+    let high_demand = message_lower.contains("currently experiencing high demand");
+    let temporary_errors = message_lower.contains("temporary errors");
+    let peak_capacity = message_lower.contains("cannot process your request")
+        && message_lower.contains("maximum usage size allowed during peak load");
+    if high_demand && (temporary_errors || peak_capacity) {
         return Some("upstream_high_demand");
     }
     if message.contains("当前模型 ")
