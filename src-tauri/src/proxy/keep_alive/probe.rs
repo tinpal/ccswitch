@@ -97,7 +97,7 @@ pub(super) async fn request(
             .and_then(|value| value.to_str().ok())
             .map(str::to_string);
     });
-    // Reuse the installed client's selected template with fresh background
+    // Reuse the selected native or fixed template with fresh background
     // identifiers and the provider's authentication.
     let forwarder = RequestForwarder::new(
         state.provider_router.clone(),
@@ -128,7 +128,7 @@ pub(super) async fn request(
     .stack_request(true);
     let mut probe_provider = provider.clone();
     if let Some(meta) = probe_provider.meta.as_mut() {
-        // Native template probes own their prompt and body. Provider body
+        // Template probes own their prompt and body. Provider body
         // overrides may contain tools, input or saved response ids intended for
         // conversations; keep only header overrides (including authentication).
         if let Some(overrides) = meta.local_proxy_request_overrides.as_mut() {

@@ -2,6 +2,7 @@
 //! Provider model rows are the source of truth; no conversation is replayed here.
 
 mod client_templates;
+mod fixed_templates;
 mod probe;
 mod prompt;
 mod response;

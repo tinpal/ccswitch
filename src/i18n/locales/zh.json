@@ -5406,8 +5406,8 @@
     "recoveryConcurrency": "恢复并发数",
     "useMinimalPrompt": "使用精简提示词",
     "minimalPromptHint": "发送 Reply only OK. 和简短的 Codex / Claude 客户端身份标识，剔除其余系统提示词、工具说明和上下文，降低输入消耗。",
-    "fullPromptHint": "使用完整原生保活模板，保留客户端系统提示词和环境上下文，输入额度消耗会增加。",
-    "help": "首次使用本机 Codex / Claude Code 生成请求模板，可为每个模型选择精简或完整提示词。首次并发，完整成功后转为单路定时请求，失败恢复并发；仍会消耗上游额度。",
+    "fullPromptHint": "保留所选保活模板的完整提示词：优先使用本地客户端模板，找不到时使用内置固定模板。输入额度消耗可能增加。",
+    "help": "优先使用本机 Codex / Claude Code 生成请求模板，找不到客户端时自动使用内置固定模板。可为每个模型选择精简或完整提示词。首次并发，完整成功后转为单路定时请求，失败恢复并发；仍会消耗上游额度。",
     "applyHint": "保存供应商后生效；仅在供应商加入聚合、代理运行时执行。同一供应商有正常对话时暂停保活。所有模型共用 16 个后台请求名额。",
     "invalid": "请填写实际请求模型；保活间隔须为 1–86400 秒，失败重试间隔须为 0–86400 秒，超时须为 1–3600 秒，并发数须为 1–64，均为整数。",
     "pendingSave": "保存后生效／等待调度",
@@ -5434,7 +5434,7 @@
       "invalid_config": "请检查保活参数",
       "foreground_active": "正常对话中，保活已暂停",
       "config_unavailable": "暂时无法读取配置",
-      "preparing_client_template": "正在生成真实客户端请求模板",
+      "preparing_client_template": "正在准备保活请求模板",
       "mode_changing": "正在切换模式，保活已暂停"
     },
     "errors": {

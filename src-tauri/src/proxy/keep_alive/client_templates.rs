@@ -1,8 +1,7 @@
-//! Obtain the installed clients' actual HTTP requests once, then reuse their
-//! transport settings for background inference with either the full native
-//! prompt or a short prompt and native client identity.
-//! No synthetic client profile or generic API fallback is used. The capture
-//! listener never forwards traffic.
+//! Prefer the installed clients' actual HTTP requests and use built-in fixed
+//! templates when a client cannot be found. Reuse the selected template with
+//! either its full prompt or a short prompt and client identity.
+//! The capture listener never forwards traffic.
 
 use axum::{
     extract::{DefaultBodyLimit, OriginalUri, State},
@@ -55,7 +54,7 @@ struct TemplateKey {
     model: String,
     bearer: bool,
     use_minimal_prompt: bool,
-    executable: ClientExecutable,
+    executable: Option<ClientExecutable>,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -136,7 +135,9 @@ impl ClientTemplates {
         use_minimal_prompt: bool,
         timeout: u32,
     ) -> Result<NativeRequest, &'static str> {
-        let executable = find_executable(client).ok_or("client_not_found")?;
+        // Rediscover on every request so installation, removal and updates can
+        // switch between fixed and native templates without restarting workers.
+        let executable = find_executable(client);
         let key = TemplateKey {
             client,
             model: model.into(),
@@ -146,7 +147,7 @@ impl ClientTemplates {
         };
         let cell = {
             let mut entries = self.entries.lock().await;
-            // Cache full and minimal prompts separately. A client update
+            // Cache full and minimal prompts separately. A discovery change
             // invalidates only the matching client's model and prompt mode.
             entries.retain(|old, _| {
                 old.client != client
@@ -166,15 +167,26 @@ impl ClientTemplates {
                 .clone()
         };
         let template = cell
-            .get_or_try_init(|| {
-                capture(
-                    client,
-                    &executable,
-                    model,
-                    bearer,
-                    use_minimal_prompt,
-                    timeout,
-                )
+            .get_or_try_init(|| async {
+                match executable.as_ref() {
+                    Some(executable) => {
+                        capture(client, executable, model, bearer, use_minimal_prompt, timeout)
+                            .await
+                    }
+                    None => {
+                        let (endpoint, headers, body) =
+                            super::fixed_templates::build(client, model, use_minimal_prompt);
+                        log::info!(
+                            "[KeepAlive] Local {} client not found; using built-in fixed request template",
+                            client.name()
+                        );
+                        Ok(RequestTemplate {
+                            endpoint: endpoint.into(),
+                            headers,
+                            body,
+                        })
+                    }
+                }
             })
             .await?;
         Ok(template.fresh(client))
@@ -245,8 +257,8 @@ impl RequestTemplate {
                 }
             }
             ClientKind::Claude => {
-                // Keep the installed client's device metadata; create a fresh
-                // session without replaying an interactive conversation.
+                // Keep the selected template's metadata; create a fresh session
+                // without replaying an interactive conversation.
                 if let Some(raw) = body.pointer_mut("/metadata/user_id") {
                     if let Some(mut identity) = raw
                         .as_str()

@@ -5406,8 +5406,8 @@
     "recoveryConcurrency": "Kurtarma eşzamanlılığı",
     "useMinimalPrompt": "Kısa istem kullan",
     "minimalPromptHint": "Reply only OK. ve kısa bir Codex / Claude istemci kimliği gönderilir. Girdi kullanımını azaltmak için diğer sistem istemleri, araç açıklamaları ve bağlam çıkarılır.",
-    "fullPromptHint": "İstemci sistem istemlerini ve ortam bağlamını içeren tam yerel canlı tutma şablonu kullanılır. Girdi kullanımı artar.",
-    "help": "Kurulu Codex / Claude Code bir istek şablonu oluşturur. Her model için kısa veya tam istem seçilebilir. Başlangıçta eşzamanlıdır; tam başarıdan sonra tek düzenli isteğe geçilir ve hata durumunda eşzamanlılık geri gelir. Sağlayıcı kotası yine tüketilir.",
+    "fullPromptHint": "Seçilen canlı tutma şablonunun tam istemi korunur. Yerel istemci şablonu tercih edilir; istemci bulunamazsa yerleşik sabit şablon kullanılır. Girdi kullanımı artabilir.",
+    "help": "İstek şablonu oluşturmak için kurulu Codex / Claude Code tercih edilir. İstemci bulunamazsa otomatik olarak yerleşik sabit şablon kullanılır. Her model için kısa veya tam istem seçilebilir. Başlangıçta eşzamanlıdır; tam başarıdan sonra tek düzenli isteğe geçilir ve hata durumunda eşzamanlılık geri gelir. Sağlayıcı kotası yine tüketilir.",
     "applyHint": "Sağlayıcı kaydedilince uygulanır. Yalnızca sağlayıcı toplama modundayken ve proxy çalışırken etkindir. Aynı sağlayıcıda sohbet sırasında duraklar. Tüm modellerin toplam arka plan istek sınırı 16’dır.",
     "invalid": "Bir model adı girin. Canlı tutma aralığı 1–86400 saniye, yeniden deneme aralığı 0–86400 saniye, zaman aşımı 1–3600 saniye ve eşzamanlılık 1–64 arasında tam sayı olmalıdır.",
     "pendingSave": "Uygulamak için kaydedin / zamanlayıcı bekleniyor",
@@ -5434,7 +5434,7 @@
       "invalid_config": "Etkin tutma ayarlarını kontrol edin",
       "foreground_active": "Sohbet sırasında duraklatıldı",
       "config_unavailable": "Ayarlar okunamıyor",
-      "preparing_client_template": "Gerçek istemci istek şablonu oluşturuluyor",
+      "preparing_client_template": "Canlı tutma istek şablonu hazırlanıyor",
       "mode_changing": "Mod değişirken duraklatıldı"
     },
     "errors": {

@@ -5406,8 +5406,8 @@
     "recoveryConcurrency": "恢復並行數",
     "useMinimalPrompt": "使用精簡提示詞",
     "minimalPromptHint": "傳送 Reply only OK. 和簡短的 Codex / Claude 用戶端身分標識，剔除其餘系統提示詞、工具說明和脈絡，降低輸入消耗。",
-    "fullPromptHint": "使用完整原生保活範本，保留用戶端系統提示詞和環境脈絡，輸入額度消耗會增加。",
-    "help": "首次使用本機 Codex / Claude Code 產生請求範本，可為每個模型選擇精簡或完整提示詞。首次並行，完整成功後轉為單路定時請求，失敗恢復並行；仍會消耗上游額度。",
+    "fullPromptHint": "保留所選保活範本的完整提示詞：優先使用本機用戶端範本，找不到時使用內建固定範本。輸入額度消耗可能增加。",
+    "help": "優先使用本機 Codex / Claude Code 產生請求範本，找不到用戶端時自動使用內建固定範本。可為每個模型選擇精簡或完整提示詞。首次並行，完整成功後轉為單路定時請求，失敗恢復並行；仍會消耗上游額度。",
     "applyHint": "儲存供應商後生效；僅在供應商加入聚合、代理執行時進行。同一供應商有正常對話時暫停保活。所有模型共用 16 個背景請求名額。",
     "invalid": "請填寫實際請求模型；保活間隔須為 1–86400 秒，失敗重試間隔須為 0–86400 秒，逾時須為 1–3600 秒，並行數須為 1–64，均為整數。",
     "pendingSave": "儲存後生效／等待排程",
@@ -5434,7 +5434,7 @@
       "invalid_config": "請檢查保活參數",
       "foreground_active": "正常對話中，保活已暫停",
       "config_unavailable": "暫時無法讀取設定",
-      "preparing_client_template": "正在產生真實用戶端請求範本",
+      "preparing_client_template": "正在準備保活請求範本",
       "mode_changing": "正在切換模式，保活已暫停"
     },
     "errors": {

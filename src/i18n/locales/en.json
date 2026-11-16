@@ -5406,8 +5406,8 @@
     "recoveryConcurrency": "Recovery concurrency",
     "useMinimalPrompt": "Use minimal prompt",
     "minimalPromptHint": "Send Reply only OK. and a short Codex / Claude client identity. Remove other system prompts, tool descriptions and context to reduce input usage.",
-    "fullPromptHint": "Use the full native keep-alive template, including client system prompts and environment context. This increases input usage.",
-    "help": "Use the installed Codex / Claude Code to generate a request template. Choose a minimal or full prompt for each model. Start concurrently; a complete success switches to timed single requests, and failure restores concurrency. Still consumes upstream quota.",
+    "fullPromptHint": "Keep the selected keep-alive template's full prompt. Prefer the local client template; use a built-in fixed template if the client is not found. This may increase input usage.",
+    "help": "Prefer the installed Codex / Claude Code to generate a request template. Automatically use a built-in fixed template if the client is not found. Choose a minimal or full prompt for each model. Start concurrently; a complete success switches to timed single requests, and failure restores concurrency. Still consumes upstream quota.",
     "applyHint": "Save the provider to apply. Runs only while this provider is in aggregation mode and the proxy is running. Pauses for conversations using the same provider. Background requests share a global limit of 16.",
     "invalid": "Enter a model name. Keep-alive interval: 1–86400 seconds; recovery interval: 0–86400 seconds; timeout: 1–3600 seconds; concurrency: 1–64. All values must be integers.",
     "pendingSave": "Save to apply / waiting for scheduler",
@@ -5434,7 +5434,7 @@
       "invalid_config": "Check keep-alive settings",
       "foreground_active": "Paused for a conversation",
       "config_unavailable": "Configuration temporarily unavailable",
-      "preparing_client_template": "Generating the real client request template",
+      "preparing_client_template": "Preparing the keep-alive request template",
       "mode_changing": "Switching mode; keep-alive paused"
     },
     "errors": {
