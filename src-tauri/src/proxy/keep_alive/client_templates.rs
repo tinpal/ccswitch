@@ -13,6 +13,7 @@ use process_wrap::tokio::{KillOnDrop, TokioChildWrapper, TokioCommandWrap};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
+    io::Read,
     path::{Path, PathBuf},
     process::Stdio,
     sync::{Arc, Mutex as StdMutex},
@@ -54,9 +55,50 @@ struct TemplateKey {
     model: String,
     bearer: bool,
     use_minimal_prompt: bool,
-    executable: PathBuf,
-    executable_bytes: u64,
-    executable_modified: Option<SystemTime>,
+    executable: ClientExecutable,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct ExecutableFile {
+    path: PathBuf,
+    bytes: u64,
+    modified: Option<SystemTime>,
+}
+
+impl ExecutableFile {
+    fn new(path: &Path) -> Option<Self> {
+        // Capture runs in a temporary directory, so relative overrides and
+        // PATH entries must be anchored before changing the child's cwd.
+        let path = std::path::absolute(path).ok()?;
+        let metadata = std::fs::metadata(&path).ok()?;
+        metadata.is_file().then(|| Self {
+            path,
+            bytes: metadata.len(),
+            modified: metadata.modified().ok(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+struct ClientExecutable {
+    program: ExecutableFile,
+    script: Option<ExecutableFile>,
+}
+
+impl ClientExecutable {
+    fn native(path: &Path) -> Option<Self> {
+        Some(Self {
+            program: ExecutableFile::new(path)?,
+            script: None,
+        })
+    }
+
+    fn node(script: &Path, install_dir: &Path) -> Option<Self> {
+        Some(Self {
+            program: ExecutableFile::new(&find_node_executable(install_dir)?)?,
+            script: Some(ExecutableFile::new(script)?),
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -95,15 +137,12 @@ impl ClientTemplates {
         timeout: u32,
     ) -> Result<NativeRequest, &'static str> {
         let executable = find_executable(client).ok_or("client_not_found")?;
-        let metadata = std::fs::metadata(&executable).map_err(|_| "client_not_found")?;
         let key = TemplateKey {
             client,
             model: model.into(),
             bearer,
             use_minimal_prompt,
             executable: executable.clone(),
-            executable_bytes: metadata.len(),
-            executable_modified: metadata.modified().ok(),
         };
         let cell = {
             let mut entries = self.entries.lock().await;
@@ -128,7 +167,14 @@ impl ClientTemplates {
         };
         let template = cell
             .get_or_try_init(|| {
-                capture(client, &executable, model, bearer, use_minimal_prompt, timeout)
+                capture(
+                    client,
+                    &executable,
+                    model,
+                    bearer,
+                    use_minimal_prompt,
+                    timeout,
+                )
             })
             .await?;
         Ok(template.fresh(client))
@@ -419,7 +465,7 @@ async fn drain_client_output<R: AsyncRead + Unpin>(mut stream: R) {
 
 async fn capture(
     client: ClientKind,
-    executable: &Path,
+    executable: &ClientExecutable,
     model: &str,
     bearer: bool,
     use_minimal_prompt: bool,
@@ -535,14 +581,21 @@ async fn capture(
 
 fn native_command(
     client: ClientKind,
-    executable: &Path,
+    executable: &ClientExecutable,
     model: &str,
     bearer: bool,
     nonce: &str,
     port: u16,
     workspace: &Path,
 ) -> Command {
-    let mut command = Command::new(executable);
+    let mut command = Command::new(&executable.program.path);
+    if let Some(script) = &executable.script {
+        // Pass the npm JavaScript entry directly to Node. Do not run a .cmd
+        // shim through a shell: model names, JSON and empty arguments must
+        // arrive unchanged, and the existing job object still owns the child.
+        command.arg(&script.path);
+        command.env_remove("NODE_OPTIONS");
+    }
     command
         .current_dir(workspace)
         .stdin(Stdio::piped())
@@ -550,6 +603,11 @@ fn native_command(
         .stderr(Stdio::piped());
     for (name, _) in std::env::vars_os() {
         let key = name.to_string_lossy().to_ascii_uppercase();
+        // The npm client may need a portable Git Bash installation to start.
+        // This is a runtime path, not provider authentication or prompt config.
+        if client == ClientKind::Claude && key == "CLAUDE_CODE_GIT_BASH_PATH" {
+            continue;
+        }
         if key.starts_with("OPENAI_")
             || key.starts_with("ANTHROPIC_")
             || key.starts_with("CLAUDE_")
@@ -644,12 +702,9 @@ fn native_command(
                     "--verbose",
                     "--model",
                     model,
-                    "--effort",
-                    "low",
                     "--max-turns",
                     "1",
                     "--no-session-persistence",
-                    "--safe-mode",
                     "--setting-sources",
                     "",
                     "--tools",
@@ -660,23 +715,30 @@ fn native_command(
                     "--mcp-config",
                     "{\"mcpServers\":{}}",
                 ]);
+            if executable.script.is_none() {
+                // Older npm cli.js releases do not define these options.
+                // They still support the empty tools/settings/MCP configuration
+                // above, which keeps their local capture inert.
+                command.args(["--effort", "low", "--safe-mode"]);
+            }
         }
     }
     command
 }
 
-fn find_executable(client: ClientKind) -> Option<PathBuf> {
+fn find_executable(client: ClientKind) -> Option<ClientExecutable> {
     let override_name = match client {
         ClientKind::Codex => "CC_SWITCH_CODEX_EXECUTABLE",
         ClientKind::Claude => "CC_SWITCH_CLAUDE_EXECUTABLE",
     };
     if let Some(path) = std::env::var_os(override_name).map(PathBuf::from) {
-        return path.is_file().then_some(path);
+        return match client {
+            ClientKind::Claude => resolve_claude_executable(&path),
+            ClientKind::Codex => ClientExecutable::native(&path),
+        };
     }
     let program = format!("{}{}", client.name(), std::env::consts::EXE_SUFFIX);
-    let path_dirs: Vec<PathBuf> = std::env::var_os("PATH")
-        .map(|paths| std::env::split_paths(&paths).collect())
-        .unwrap_or_default();
+    let path_dirs = client_search_dirs(client.name());
     for directory in &path_dirs {
         // Resolve the first npm CLI shim before an unrelated bundled binary
         // later on PATH, matching the user's normal Codex command.
@@ -685,34 +747,210 @@ fn find_executable(client: ClientKind) -> Option<PathBuf> {
             && (directory.join("codex.ps1").is_file() || directory.join("codex.cmd").is_file())
         {
             if let Some(path) = npm_codex_executable(directory) {
-                return Some(path);
+                return ClientExecutable::native(&path);
             }
         }
         let path = directory.join(&program);
         if path.is_file() {
-            return Some(path);
+            let executable = match client {
+                ClientKind::Claude => resolve_claude_executable(&path),
+                ClientKind::Codex => ClientExecutable::native(&path),
+            };
+            if executable.is_some() {
+                return executable;
+            }
         }
-    }
-    if client == ClientKind::Claude {
-        if let Some(home) = dirs::home_dir() {
-            let path = home.join(".local/bin").join(&program);
-            if path.is_file() {
-                return Some(path);
+        if cfg!(windows)
+            && client == ClientKind::Claude
+            && (directory.join("claude.ps1").is_file() || directory.join("claude.cmd").is_file())
+        {
+            if let Some(executable) = npm_claude_executable(directory) {
+                return Some(executable);
             }
         }
     }
-    if client == ClientKind::Codex {
-        let mut roots = path_dirs;
-        if let Some(app_data) = std::env::var_os("APPDATA") {
-            roots.push(PathBuf::from(app_data).join("npm"));
+    let mut roots = path_dirs;
+    for name in ["NPM_CONFIG_PREFIX", "npm_config_prefix"] {
+        if let Some(prefix) = std::env::var_os(name).filter(|value| !value.is_empty()) {
+            let prefix = PathBuf::from(prefix);
+            for root in [prefix.clone(), prefix.join("bin")] {
+                if !roots.contains(&root) {
+                    roots.push(root);
+                }
+            }
         }
-        for root in roots {
-            if let Some(path) = npm_codex_executable(&root) {
-                return Some(path);
+    }
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        let root = PathBuf::from(app_data).join("npm");
+        if !roots.contains(&root) {
+            roots.push(root);
+        }
+    }
+    for root in roots {
+        let executable = match client {
+            ClientKind::Claude => npm_claude_executable(&root),
+            ClientKind::Codex => {
+                npm_codex_executable(&root).and_then(|path| ClientExecutable::native(&path))
+            }
+        };
+        if executable.is_some() {
+            return executable;
+        }
+    }
+    None
+}
+
+fn client_search_dirs(tool: &str) -> Vec<PathBuf> {
+    let mut directories: Vec<PathBuf> = std::env::var_os("PATH")
+        .map(|paths| std::env::split_paths(&paths).collect())
+        .unwrap_or_default();
+    // Keep the process PATH's precedence. Reuse application tool discovery for
+    // registry PATH, npm's default prefix and Node version manager fallbacks.
+    for directory in crate::commands::cli_search_paths(tool) {
+        if !directories.contains(&directory) {
+            directories.push(directory);
+        }
+    }
+    directories
+}
+
+fn find_node_executable(install_dir: &Path) -> Option<PathBuf> {
+    let program = format!("node{}", std::env::consts::EXE_SUFFIX);
+    let mut directories = vec![install_dir.to_path_buf(), install_dir.join("bin")];
+    if install_dir.file_name().is_some_and(|name| name == "lib") {
+        if let Some(prefix) = install_dir.parent() {
+            directories.push(prefix.join("bin"));
+        }
+    }
+    directories.extend(client_search_dirs("node"));
+    directories
+        .into_iter()
+        .map(|directory| directory.join(&program))
+        .find(|path| path.is_file())
+}
+
+fn resolve_claude_executable(path: &Path) -> Option<ClientExecutable> {
+    if !path.is_file() {
+        return None;
+    }
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if cfg!(windows) && matches!(extension.as_str(), "cmd" | "bat" | "ps1") {
+        return npm_claude_executable(path.parent()?);
+    }
+    // POSIX npm commands are symlinks to cli.js; Windows overrides may point
+    // directly at that same entry instead of the npm shim.
+    let target = std::fs::canonicalize(path).ok()?;
+    let extension = target
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if matches!(extension.as_str(), "js" | "cjs" | "mjs") {
+        let install_dir = target
+            .ancestors()
+            .find(|directory| {
+                directory
+                    .file_name()
+                    .is_some_and(|name| name == "node_modules")
+            })
+            .and_then(Path::parent)
+            .or_else(|| target.parent())?;
+        return ClientExecutable::node(&target, install_dir);
+    }
+    ClientExecutable::native(path)
+}
+
+fn npm_claude_executable(root: &Path) -> Option<ClientExecutable> {
+    let mut packages = vec![
+        root.join("node_modules/@anthropic-ai/claude-code"),
+        root.join("lib/node_modules/@anthropic-ai/claude-code"),
+    ];
+    if let Some(prefix) = root.parent() {
+        packages.push(prefix.join("lib/node_modules/@anthropic-ai/claude-code"));
+    }
+    for package in packages {
+        let manifest: Value = match std::fs::read(package.join("package.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        {
+            Some(manifest) => manifest,
+            None => continue,
+        };
+        if manifest.get("name").and_then(Value::as_str) != Some("@anthropic-ai/claude-code") {
+            continue;
+        }
+        if let Some(bin) = manifest
+            .get("bin")
+            .and_then(|bin| bin.as_str().or_else(|| bin.get("claude")?.as_str()))
+        {
+            let relative = Path::new(bin);
+            if !relative.is_absolute()
+                && relative.components().all(|part| {
+                    matches!(
+                        part,
+                        std::path::Component::Normal(_) | std::path::Component::CurDir
+                    )
+                })
+            {
+                let entry = package.join(relative);
+                if let Some(executable) = npm_claude_entry(&entry, root) {
+                    return Some(executable);
+                }
+            }
+        }
+        // Current packages copy a native binary over bin/claude.exe. The
+        // tarball's placeholder is a shell script, not a Windows executable.
+        // If postinstall was skipped, use an installed platform payload only.
+        let platform = match (std::env::consts::OS, std::env::consts::ARCH) {
+            ("windows", "x86_64") => Some("claude-code-win32-x64"),
+            ("windows", "aarch64") => Some("claude-code-win32-arm64"),
+            _ => None,
+        };
+        if let Some(platform) = platform {
+            let scope = package.parent()?;
+            for payload in [
+                scope.join(platform),
+                package.join("node_modules/@anthropic-ai").join(platform),
+            ] {
+                if let Some(executable) = npm_claude_entry(&payload.join("claude.exe"), root) {
+                    return Some(executable);
+                }
+            }
+        }
+        for relative in ["bin/claude.exe", "claude.exe", "cli.js"] {
+            if let Some(executable) = npm_claude_entry(&package.join(relative), root) {
+                return Some(executable);
             }
         }
     }
     None
+}
+
+fn npm_claude_entry(entry: &Path, install_dir: &Path) -> Option<ClientExecutable> {
+    if !entry.is_file() {
+        return None;
+    }
+    if entry
+        .extension()
+        .is_some_and(|extension| matches!(extension.to_str(), Some("js" | "cjs" | "mjs")))
+    {
+        return ClientExecutable::node(entry, install_dir);
+    }
+    if cfg!(windows) {
+        let mut magic = [0; 2];
+        std::fs::File::open(entry)
+            .ok()?
+            .read_exact(&mut magic)
+            .ok()?;
+        if magic != *b"MZ" {
+            return None;
+        }
+    }
+    ClientExecutable::native(entry)
 }
 
 fn npm_codex_executable(root: &Path) -> Option<PathBuf> {

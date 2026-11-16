@@ -68,6 +68,7 @@ pub use hermes::*;
 pub use import_export::*;
 pub use kimi_oauth::*;
 pub use mcp::*;
+pub(crate) use misc::build_tool_search_paths as cli_search_paths;
 pub use misc::*;
 pub use model_fetch::*;
 pub use omo::*;
