@@ -103,6 +103,32 @@ export function ModelKeepAliveField({
         </Button>
       </div>
       <CollapsibleContent id={`${id}-settings`} className="space-y-3 pt-3">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Switch
+              id={`${id}-minimal-prompt`}
+              size="sm"
+              checked={config.useMinimalPrompt === true}
+              aria-describedby={`${id}-prompt-hint`}
+              onCheckedChange={(useMinimalPrompt) =>
+                onChange({ ...config, useMinimalPrompt })
+              }
+            />
+            <Label htmlFor={`${id}-minimal-prompt`} className="text-xs">
+              {t("modelKeepAlive.useMinimalPrompt")}
+            </Label>
+          </div>
+          <p
+            id={`${id}-prompt-hint`}
+            className="text-xs leading-relaxed text-fg-2"
+          >
+            {t(
+              config.useMinimalPrompt
+                ? "modelKeepAlive.minimalPromptHint"
+                : "modelKeepAlive.fullPromptHint",
+            )}
+          </p>
+        </div>
         <RetryDelayField
           value={config.retryDelay}
           onChange={(retryDelay) =>

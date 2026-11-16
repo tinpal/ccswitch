@@ -54,6 +54,7 @@ pub(super) async fn request(
     provider: &Provider,
     model: &str,
     timeout: u32,
+    use_minimal_prompt: bool,
     status: &SharedStatus,
     response_meta: &crate::proxy::upstream_errors::UpstreamResponseMeta,
 ) -> Result<u16, ProbeError> {
@@ -85,7 +86,7 @@ pub(super) async fn request(
     let native = state
         .keep_alive
         .client_templates
-        .prepare(client, &request_model, bearer, timeout)
+        .prepare(client, &request_model, bearer, use_minimal_prompt, timeout)
         .await;
     update(status, |s| s.reason = None);
     let native = native.map_err(|code| ProbeError::new(code, None))?;
@@ -96,8 +97,8 @@ pub(super) async fn request(
             .and_then(|value| value.to_str().ok())
             .map(str::to_string);
     });
-    // The installed client generated the complete request. Only fresh background
-    // identifiers and the provider's own authentication are substituted.
+    // Reuse the installed client's selected template with fresh background
+    // identifiers and the provider's authentication.
     let forwarder = RequestForwarder::new(
         state.provider_router.clone(),
         timeout as u64,
@@ -136,7 +137,7 @@ pub(super) async fn request(
         meta.max_output_tokens = None;
     }
     let mut extensions = Extensions::new();
-    extensions.insert(NativeClientRequest);
+    extensions.insert(NativeClientRequest { use_minimal_prompt });
     extensions.insert(response_meta.clone());
     let response = forwarder
         .forward_keep_alive(

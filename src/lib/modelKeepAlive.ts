@@ -3,6 +3,7 @@ import { retryDelayConfig, validRetryDelay } from "@/lib/retryDelay";
 
 export const DEFAULT_MODEL_KEEP_ALIVE: ModelKeepAliveConfig = {
   enabled: false,
+  useMinimalPrompt: true,
   intervalSeconds: 60,
   retryIntervalSeconds: 5,
   retryDelay: retryDelayConfig(),
@@ -16,6 +17,7 @@ export function modelKeepAliveConfig(
   return {
     ...DEFAULT_MODEL_KEEP_ALIVE,
     ...value,
+    useMinimalPrompt: value?.useMinimalPrompt ?? true,
     retryDelay: retryDelayConfig(value?.retryDelay),
   };
 }
@@ -25,6 +27,7 @@ export function validModelKeepAlive(value?: ModelKeepAliveConfig): boolean {
   const config = modelKeepAliveConfig(value);
   return (
     typeof config.enabled === "boolean" &&
+    typeof config.useMinimalPrompt === "boolean" &&
     validRetryDelay(config.retryDelay) &&
     Number.isInteger(config.intervalSeconds) &&
     config.intervalSeconds >= 1 &&

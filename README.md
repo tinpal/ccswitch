@@ -1,7 +1,8 @@
-> **Customized CC Switch 4.0.42 — tinpal/ccswitch**
+> **Customized CC Switch 4.0.44 — tinpal/ccswitch**
 >
-> This repository contains the customized source used for the Windows 4.0.42 build, based on `farion1231/cc-switch`.
+> This repository contains the customized source used for the Windows 4.0.44 build, based on `farion1231/cc-switch`.
 > Additions include native-client model keep-alive, aggregation retries, an independent upstream error history, and switchable fixed / exponential backoff with jitter.
+> Version 4.0.44 adds a per-model minimal prompt switch, enabled by default, and retains native Codex / Claude identity in minimal mode. Full mode uses the captured native template.
 > See [定制功能与构建说明](CUSTOMIZATION.md) for configuration, build commands and provenance. The original upstream documentation follows.
 
 <div align="center">

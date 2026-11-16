@@ -3,12 +3,17 @@
 
 mod client_templates;
 mod probe;
+mod prompt;
 mod response;
+
+pub(super) use prompt::minimize_prompt;
 
 /// In-process provenance. A network client cannot opt into background template
 /// handling by sending a header.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct NativeClientRequest;
+pub(super) struct NativeClientRequest {
+    pub use_minimal_prompt: bool,
+}
 
 use super::server::ProxyState;
 use crate::{
@@ -548,6 +553,7 @@ async fn attempt(
             &spec.provider,
             &spec.model,
             spec.config.timeout_seconds,
+            spec.config.use_minimal_prompt,
             &status,
             &response_meta,
         ),

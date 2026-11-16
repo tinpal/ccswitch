@@ -1,6 +1,7 @@
-> **CC Switch 4.0.42 定制版 — tinpal/ccswitch**
+> **CC Switch 4.0.44 定制版 — tinpal/ccswitch**
 >
 > 基于 `farion1231/cc-switch`，包含真实客户端模板保活、聚合重试、独立上游错误页，以及固定间隔 / 指数退避加随机抖动切换。
+> 4.0.44 新增每个模型的“使用精简提示词”开关，默认开启；精简模式保留 Codex / Claude 原生身份标识，关闭后使用完整原生模板。
 > 使用方式、构建命令与源码来源见 [定制说明](CUSTOMIZATION.md)。下方保留上游原始文档。
 
 <div align="center">

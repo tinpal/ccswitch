@@ -1,6 +1,8 @@
 //! Obtain the installed clients' actual HTTP requests once, then reuse their
-//! request structure for background inference. No synthetic client profile or
-//! generic API fallback is used. The capture listener never forwards traffic.
+//! transport settings for background inference with either the full native
+//! prompt or a short prompt and native client identity.
+//! No synthetic client profile or generic API fallback is used. The capture
+//! listener never forwards traffic.
 
 use axum::{
     extract::{DefaultBodyLimit, OriginalUri, State},
@@ -26,9 +28,10 @@ use tokio::{
 };
 use uuid::Uuid;
 
+use super::prompt::{minimize_prompt, PROMPT};
+
 const MAX_TEMPLATE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_CACHED_TEMPLATES: usize = 128;
-const PROMPT: &str = "Reply only OK. Do not use tools.";
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub(super) enum ClientKind {
@@ -50,6 +53,7 @@ struct TemplateKey {
     client: ClientKind,
     model: String,
     bearer: bool,
+    use_minimal_prompt: bool,
     executable: PathBuf,
     executable_bytes: u64,
     executable_modified: Option<SystemTime>,
@@ -87,6 +91,7 @@ impl ClientTemplates {
         client: ClientKind,
         model: &str,
         bearer: bool,
+        use_minimal_prompt: bool,
         timeout: u32,
     ) -> Result<NativeRequest, &'static str> {
         let executable = find_executable(client).ok_or("client_not_found")?;
@@ -95,15 +100,21 @@ impl ClientTemplates {
             client,
             model: model.into(),
             bearer,
+            use_minimal_prompt,
             executable: executable.clone(),
             executable_bytes: metadata.len(),
             executable_modified: metadata.modified().ok(),
         };
         let cell = {
             let mut entries = self.entries.lock().await;
-            // A client update invalidates only that client's model template.
+            // Cache full and minimal prompts separately. A client update
+            // invalidates only the matching client's model and prompt mode.
             entries.retain(|old, _| {
-                old.client != client || old.model != model || old.bearer != bearer || *old == key
+                old.client != client
+                    || old.model != model
+                    || old.bearer != bearer
+                    || old.use_minimal_prompt != use_minimal_prompt
+                    || *old == key
             });
             if !entries.contains_key(&key) && entries.len() >= MAX_CACHED_TEMPLATES {
                 if let Some(old) = entries.keys().next().cloned() {
@@ -116,7 +127,9 @@ impl ClientTemplates {
                 .clone()
         };
         let template = cell
-            .get_or_try_init(|| capture(client, &executable, model, bearer, timeout))
+            .get_or_try_init(|| {
+                capture(client, &executable, model, bearer, use_minimal_prompt, timeout)
+            })
             .await?;
         Ok(template.fresh(client))
     }
@@ -242,6 +255,7 @@ fn replace_identifiers(value: &mut Value, replacements: &[(String, String)]) {
 #[derive(Clone)]
 struct CaptureState {
     client: ClientKind,
+    use_minimal_prompt: bool,
     nonce: String,
     sender: Arc<StdMutex<Option<oneshot::Sender<RequestTemplate>>>>,
 }
@@ -281,7 +295,7 @@ async fn capture_request(
             Json(json!({"error": {"message": "Local capture only"}})),
         );
     }
-    if let Ok(body) = serde_json::from_slice::<Value>(&bytes) {
+    if let Ok(mut body) = serde_json::from_slice::<Value>(&bytes) {
         if body
             .get("model")
             .and_then(Value::as_str)
@@ -289,6 +303,11 @@ async fn capture_request(
             && body.get("stream").and_then(Value::as_bool) == Some(true)
             && !body.to_string().contains(&state.nonce)
         {
+            if state.use_minimal_prompt {
+                // Cache only the short prompt and recognized native identity
+                // when minimization is enabled for this model.
+                minimize_prompt(&mut body);
+            }
             let mut public_headers = HeaderMap::new();
             for (name, value) in &headers {
                 if is_public_template_header(name.as_str()) {
@@ -403,6 +422,7 @@ async fn capture(
     executable: &Path,
     model: &str,
     bearer: bool,
+    use_minimal_prompt: bool,
     timeout: u32,
 ) -> Result<RequestTemplate, &'static str> {
     let workspace = tempfile::Builder::new()
@@ -422,6 +442,7 @@ async fn capture(
         .layer(DefaultBodyLimit::max(MAX_TEMPLATE_BYTES))
         .with_state(CaptureState {
             client,
+            use_minimal_prompt,
             nonce: nonce.clone(),
             sender: Arc::new(StdMutex::new(Some(sender))),
         });

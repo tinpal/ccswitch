@@ -691,6 +691,7 @@ pub struct ClaudeStackModel {
 #[serde(default, rename_all = "camelCase")]
 pub struct ModelKeepAliveConfig {
     pub enabled: bool,
+    pub use_minimal_prompt: bool,
     pub interval_seconds: u32,
     pub retry_interval_seconds: u32,
     pub retry_delay: crate::retry_delay::RetryDelayConfig,
@@ -702,6 +703,7 @@ impl Default for ModelKeepAliveConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            use_minimal_prompt: true,
             interval_seconds: 60,
             retry_interval_seconds: 5,
             retry_delay: crate::retry_delay::RetryDelayConfig::default(),

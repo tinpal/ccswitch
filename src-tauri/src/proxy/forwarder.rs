@@ -2306,6 +2306,16 @@ impl RequestForwarder {
                 }
             }
         }
+        let native_template = extensions.get::<super::keep_alive::NativeClientRequest>();
+        let native_client_request = native_template.is_some();
+        let minimal_client_request =
+            native_template.is_some_and(|request| request.use_minimal_prompt);
+        if minimal_client_request {
+            // Minimize again after provider transformations, keeping only a
+            // recognized native client identity and the short user prompt.
+            super::keep_alive::minimize_prompt(&mut filtered_body);
+            filtered_body = prepare_upstream_request_body(filtered_body);
+        }
         // 出站 body 定稿后刷新真值（覆盖 Codex chat 上游模型覆写、转换层模型改写）
         if let Some(m) = filtered_body
             .get("model")
@@ -2325,9 +2335,6 @@ impl RequestForwarder {
         );
         let request_is_streaming =
             is_streaming_request(&effective_endpoint, &filtered_body, headers);
-        let native_client_request = extensions
-            .get::<super::keep_alive::NativeClientRequest>()
-            .is_some();
         let force_identity_encoding = needs_transform
             || codex_responses_to_chat
             || codex_responses_to_anthropic

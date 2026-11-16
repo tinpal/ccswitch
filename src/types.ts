@@ -258,6 +258,8 @@ export interface ClaudeStackModel {
 
 export interface ModelKeepAliveConfig {
   enabled: boolean;
+  /** Missing in legacy data keeps prompt minimization enabled. */
+  useMinimalPrompt?: boolean;
   intervalSeconds: number;
   retryIntervalSeconds: number;
   /** Missing in legacy data means fixed intervals. */
