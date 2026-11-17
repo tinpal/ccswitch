@@ -2418,6 +2418,8 @@
     "multiplier": "倍率",
     "requestModel": "請求模型",
     "responseModel": "回傳模型",
+    "actualModel": "實際模型",
+    "actualModelBadge": "實際 {{model}}",
     "noData": "暫無資料",
     "unknownProvider": "未知供應商",
     "sessionProvider": {

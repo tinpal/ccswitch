@@ -2362,6 +2362,8 @@
     "multiplier": "Çarpan",
     "requestModel": "Talep Modeli",
     "responseModel": "Tepki Modeli",
+    "actualModel": "Gerçek model",
+    "actualModelBadge": "Gerçek {{model}}",
     "noData": "Veri yok",
     "unknownProvider": "Bilinmeyen Sağlayıcı",
     "sessionProvider": {

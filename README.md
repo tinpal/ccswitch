@@ -6,6 +6,7 @@
 > Keep-alive also recognizes npm-installed Claude Code, including JavaScript entries launched with Node and native binaries inside the npm package.
 > When local Codex or Claude Code is not found, keep-alive automatically uses a built-in fixed request template. It switches back to the native template once the client is detected.
 > Aggregation retries recognize structured HTTP 200 errors with `no_capacity` or `too_many_requests`, plus the specific peak-load capacity message, before productive output begins.
+> Request logs show an actual-model badge from the log's `model` field, even when it matches the requested model. The primary name prefers `requestModel` and falls back to `model`.
 > See [定制功能与构建说明](CUSTOMIZATION.md) for configuration, build commands and provenance. The original upstream documentation follows.
 
 <div align="center">

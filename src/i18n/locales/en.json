@@ -2418,6 +2418,8 @@
     "multiplier": "Multiplier",
     "requestModel": "Request Model",
     "responseModel": "Response Model",
+    "actualModel": "Actual model",
+    "actualModelBadge": "Actual {{model}}",
     "noData": "No data",
     "unknownProvider": "Unknown Provider",
     "sessionProvider": {

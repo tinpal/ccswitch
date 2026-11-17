@@ -2417,6 +2417,8 @@
     "multiplier": "Коэффициент",
     "requestModel": "Модель запроса",
     "responseModel": "Модель ответа",
+    "actualModel": "Фактическая модель",
+    "actualModelBadge": "Фактически {{model}}",
     "noData": "Нет данных",
     "unknownProvider": "Неизвестный провайдер",
     "sessionProvider": {

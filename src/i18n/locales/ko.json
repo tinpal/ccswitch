@@ -2418,6 +2418,8 @@
     "multiplier": "배율",
     "requestModel": "요청 모델",
     "responseModel": "응답 모델",
+    "actualModel": "실제 모델",
+    "actualModelBadge": "실제 {{model}}",
     "noData": "데이터 없음",
     "unknownProvider": "알 수 없는 공급자",
     "sessionProvider": {

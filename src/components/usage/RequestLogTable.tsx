@@ -135,6 +135,22 @@ export function appShortName(appType: string): string {
 
 const isSuccessStatus = (code: number) => code >= 200 && code < 300;
 
+/** Hide only CC Switch's routing prefix; keep upstream namespaces intact. */
+function requestedModelLabel(log: RequestLog): string {
+  const requested = log.requestModel?.trim() || log.model.trim();
+  const route =
+    log.appType === "codex"
+      ? { prefix: "ccs-", separator: "/" }
+      : log.appType === "claude"
+        ? { prefix: "ccs-claude-", separator: "--" }
+        : null;
+  if (!route || !requested.startsWith(route.prefix)) return requested;
+  const rest = requested.slice(route.prefix.length);
+  const separator = rest.indexOf(route.separator);
+  const model = rest.slice(separator + route.separator.length);
+  return separator > 0 && model ? model : requested;
+}
+
 const DEFAULT_COLUMNS = resolveRequestLogColumns(undefined);
 
 /**
@@ -406,6 +422,8 @@ export function RequestLogTable({
               ? t("usage.estimatedTimingTip", timing)
               : undefined;
     const multiplier = parseFiniteNumber(log.costMultiplier);
+    const requestedModel = requestedModelLabel(log);
+    const actualModel = log.model.trim();
     const modelTitle =
       log.requestModel && log.requestModel !== log.model
         ? `${log.requestModel} → ${log.model}`
@@ -473,7 +491,17 @@ export function RequestLogTable({
       ),
       model: (
         <td className={cn(usageTable.td, usageTable.mono)}>
-          <span title={modelTitle}>{log.model}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span title={modelTitle}>{requestedModel || "—"}</span>
+            {actualModel && (
+              <span
+                className="inline-flex rounded-[4px] bg-warning-soft px-1.5 py-0.5 font-sans text-badge text-warning-text"
+                title={`${t("usage.responseModel")}: ${actualModel}`}
+              >
+                {t("usage.actualModelBadge", { model: actualModel })}
+              </span>
+            )}
+          </span>
         </td>
       ),
       freshInput: (

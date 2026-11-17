@@ -2418,6 +2418,8 @@
     "multiplier": "倍率",
     "requestModel": "リクエストモデル",
     "responseModel": "レスポンスモデル",
+    "actualModel": "実際のモデル",
+    "actualModelBadge": "実際 {{model}}",
     "noData": "データなし",
     "unknownProvider": "不明なプロバイダー",
     "sessionProvider": {

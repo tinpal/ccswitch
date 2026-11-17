@@ -5,6 +5,7 @@
 > 保活支持 npm 安装的 Claude Code，可识别由 Node 启动的 JS 入口和 npm 包内的原生二进制。
 > 找不到本地 Codex / Claude Code 时，保活自动使用内置固定请求模板；后续检测到客户端时自动切回原生模板。
 > 聚合重试可识别 HTTP 200 响应中的 `no_capacity` / `too_many_requests` 结构化错误及明确的峰值负载容量不足消息，在有效输出前继续重试。
+> 请求日志新增取自日志 `model` 字段的“实际模型”标签，与请求模型同名时也显示；主名称优先取 `requestModel`，缺失时回退到 `model`。
 > 使用方式、构建命令与源码来源见 [定制说明](CUSTOMIZATION.md)。下方保留上游原始文档。
 
 <div align="center">
